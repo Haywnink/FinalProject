@@ -10,15 +10,23 @@ import (
 )
 
 func Run() error {
+	dbPath := os.Getenv("TODO_DBFILE")
+	if dbPath == "" {
+		dbPath = "scheduler.db"
+	}
+	database, err := db.New(dbPath)
+	if err != nil {
+		return fmt.Errorf("database initialization error: %v", err)
+	}
+	defer database.Close()
+
+	api.Init(database)
+
+	http.Handle("/", http.FileServer(http.Dir("web")))
 	port := os.Getenv("TODO_PORT")
 	if port == "" {
 		port = "7540"
 	}
-	if err := db.Init("scheduler.db"); err != nil {
-		return fmt.Errorf("ошибка инициализации БД: %v", err)
-	}
-	api.Init()
-	http.Handle("/", http.FileServer(http.Dir("web")))
-	fmt.Printf("Слушаем порт :%s\n", port)
+	fmt.Printf("Listening on port %s\n", port)
 	return http.ListenAndServe(":"+port, nil)
 }

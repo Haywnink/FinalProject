@@ -1,18 +1,21 @@
 package db
 
-import "fmt"
+import (
+	"database/sql"
+	"fmt"
+)
 
 type Task struct {
-	ID      string `json:"id"`
+	ID      int64  `json:"id"`
 	Date    string `json:"date"`
 	Title   string `json:"title"`
 	Comment string `json:"comment"`
 	Repeat  string `json:"repeat"`
 }
 
-func AddTask(t *Task) (int64, error) {
-	res, err := Conn.Exec(
-		"INSERT INTO scheduler(date,title,comment,repeat) VALUES(?,?,?,?)",
+func (db *DB) AddTask(t *Task) (int64, error) {
+	res, err := db.conn.Exec(
+		"INSERT INTO scheduler(date, title, comment, repeat) VALUES(?,?,?,?)",
 		t.Date, t.Title, t.Comment, t.Repeat,
 	)
 	if err != nil {
@@ -21,21 +24,24 @@ func AddTask(t *Task) (int64, error) {
 	return res.LastInsertId()
 }
 
-func GetTask(id string) (*Task, error) {
+func (db *DB) GetTask(id int64) (*Task, error) {
 	var t Task
-	err := Conn.QueryRow(
-		"SELECT id,date,title,comment,repeat FROM scheduler WHERE id = ?",
+	err := db.conn.QueryRow(
+		"SELECT id, date, title, comment, repeat FROM scheduler WHERE id = ?",
 		id,
 	).Scan(&t.ID, &t.Date, &t.Title, &t.Comment, &t.Repeat)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("task not found")
+		}
 		return nil, err
 	}
 	return &t, nil
 }
 
-func UpdateTask(t *Task) error {
-	res, err := Conn.Exec(
-		"UPDATE scheduler SET date=?,title=?,comment=?,repeat=? WHERE id=?",
+func (db *DB) UpdateTask(t *Task) error {
+	res, err := db.conn.Exec(
+		"UPDATE scheduler SET date = ?, title = ?, comment = ?, repeat = ? WHERE id = ?",
 		t.Date, t.Title, t.Comment, t.Repeat, t.ID,
 	)
 	if err != nil {
@@ -46,13 +52,13 @@ func UpdateTask(t *Task) error {
 		return err
 	}
 	if n == 0 {
-		return fmt.Errorf("задача не найдена")
+		return fmt.Errorf("task not found")
 	}
 	return nil
 }
 
-func DeleteTask(id string) error {
-	res, err := Conn.Exec(
+func (db *DB) DeleteTask(id int64) error {
+	res, err := db.conn.Exec(
 		"DELETE FROM scheduler WHERE id = ?",
 		id,
 	)
@@ -64,38 +70,21 @@ func DeleteTask(id string) error {
 		return err
 	}
 	if n == 0 {
-		return fmt.Errorf("задача не найдена")
+		return fmt.Errorf("task not found")
 	}
 	return nil
 }
 
-func UpdateDate(date, id string) error {
-	res, err := Conn.Exec(
-		"UPDATE scheduler SET date=? WHERE id=?",
-		date, id,
-	)
-	if err != nil {
-		return err
-	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return fmt.Errorf("задача не найдена")
-	}
-	return nil
-}
-
-func Tasks(limit int) ([]*Task, error) {
-	rows, err := Conn.Query(
-		"SELECT id,date,title,comment,repeat FROM scheduler ORDER BY date LIMIT ?",
+func (db *DB) Tasks(limit int) ([]*Task, error) {
+	rows, err := db.conn.Query(
+		"SELECT id, date, title, comment, repeat FROM scheduler ORDER BY date LIMIT ?",
 		limit,
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+
 	var list []*Task
 	for rows.Next() {
 		var t Task
@@ -104,8 +93,10 @@ func Tasks(limit int) ([]*Task, error) {
 		}
 		list = append(list, &t)
 	}
-	if list == nil {
-		list = make([]*Task, 0)
+
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
+
 	return list, nil
 }

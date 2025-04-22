@@ -2,15 +2,13 @@ package api
 
 import (
 	"net/http"
-
-	"github.com/Haywnink/FinalProject/pkg/db"
 )
 
 func tasksHandler(w http.ResponseWriter, r *http.Request) {
-	list, err := db.Tasks(50)
+	list, err := database.Tasks(50)
 	if err != nil {
-		writeJSON(w, map[string]string{"error": "ошибка получения списка задач"})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "could not get tasks"})
 		return
 	}
-	writeJSON(w, map[string]interface{}{"tasks": list})
+	writeJSON(w, http.StatusOK, map[string]interface{}{"tasks": list})
 }

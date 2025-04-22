@@ -9,26 +9,43 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-var jwtKey = []byte(os.Getenv("TODO_PASSWORD"))
+var (
+	password string
+	jwtKey   []byte
+)
+
+func init() {
+	password = os.Getenv("TODO_PASSWORD")
+	jwtKey = []byte(password)
+}
 
 type claims struct {
 	jwt.RegisteredClaims
 }
 
 func SignInHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+
 	var req struct {
 		Password string `json:"password"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
-	pass := os.Getenv("TODO_PASSWORD")
-	if pass == "" {
-		writeJSON(w, map[string]string{"error": "authentication disabled"})
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
 		return
 	}
-	if req.Password != pass {
-		writeJSON(w, map[string]string{"error": "Неверный пароль"})
+
+	if password == "" {
+		writeJSON(w, http.StatusOK, map[string]string{"message": "authentication disabled"})
 		return
 	}
+	if req.Password != password {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid password"})
+		return
+	}
+
 	now := time.Now().UTC()
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, &claims{
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -39,26 +56,26 @@ func SignInHandler(w http.ResponseWriter, r *http.Request) {
 	})
 	signed, err := token.SignedString(jwtKey)
 	if err != nil {
-		writeJSON(w, map[string]string{"error": "token generation error"})
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "token generation error"})
 		return
 	}
-	writeJSON(w, map[string]string{"token": signed})
+
+	writeJSON(w, http.StatusOK, map[string]string{"token": signed})
 }
 
 func auth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		pass := os.Getenv("TODO_PASSWORD")
-		if pass != "" {
+		if password != "" {
 			cookie, err := r.Cookie("token")
 			if err != nil {
-				http.Error(w, "Authentication required", http.StatusUnauthorized)
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "authentication required"})
 				return
 			}
 			tok, err := jwt.ParseWithClaims(cookie.Value, &claims{}, func(t *jwt.Token) (interface{}, error) {
 				return jwtKey, nil
 			})
 			if err != nil || !tok.Valid {
-				http.Error(w, "Authentication required", http.StatusUnauthorized)
+				writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "authentication required"})
 				return
 			}
 		}

@@ -2,45 +2,48 @@ package api
 
 import (
 	"net/http"
+	"strconv"
 	"time"
-
-	"github.com/Haywnink/FinalProject/pkg/db"
 )
 
 func doneHandler(w http.ResponseWriter, r *http.Request) {
-	id := r.URL.Query().Get("id")
-	if id == "" {
-		writeJSON(w, map[string]string{"error": "не указан идентификатор"})
+	idStr := r.URL.Query().Get("id")
+	if idStr == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "id is required"})
 		return
 	}
-	t, err := db.GetTask(id)
+	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		writeJSON(w, map[string]string{"error": "задача не найдена"})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
+		return
+	}
+	t, err := database.GetTask(id)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "task not found"})
 		return
 	}
 	if t.Repeat == "" {
-		// одноразовая — удаляем
-		if err := db.DeleteTask(id); err != nil {
-			writeJSON(w, map[string]string{"error": "ошибка удаления задачи"})
+		if err := database.DeleteTask(id); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "could not delete task"})
 			return
 		}
 	} else {
-		// повторяющаяся — прибавляем ровно один интервал к хранимой дате
 		loc := time.Now().Location()
 		baseDate, err := time.ParseInLocation("20060102", t.Date, loc)
 		if err != nil {
-			writeJSON(w, map[string]string{"error": "некорректная дата задачи"})
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "invalid task date"})
 			return
 		}
 		next, err := NextDate(baseDate, t.Date, t.Repeat)
 		if err != nil {
-			writeJSON(w, map[string]string{"error": err.Error()})
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 			return
 		}
-		if err := db.UpdateDate(next, id); err != nil {
-			writeJSON(w, map[string]string{"error": "ошибка обновления даты"})
+		t.Date = next
+		if err := database.UpdateTask(t); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "could not update task"})
 			return
 		}
 	}
-	writeJSON(w, map[string]string{})
+	writeJSON(w, http.StatusOK, map[string]string{})
 }

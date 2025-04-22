@@ -19,23 +19,30 @@ CREATE TABLE scheduler (
 CREATE INDEX idx_date ON scheduler(date);
 `
 
-var Conn *sql.DB
+type DB struct {
+	conn *sql.DB
+}
 
-func Init(defaultPath string) error {
-	path := os.Getenv("TODO_DBFILE")
-	if path == "" {
-		path = defaultPath
-	}
+func New(path string) (*DB, error) {
 	_, err := os.Stat(path)
-	first := os.IsNotExist(err)
-	Conn, err = sql.Open("sqlite", path)
+	isNew := os.IsNotExist(err)
+	conn, err := sql.Open("sqlite", path)
 	if err != nil {
-		return fmt.Errorf("ошибка открытия БД: %v", err)
+		return nil, fmt.Errorf("failed to open database: %v", err)
 	}
-	if first {
-		if _, err = Conn.Exec(schema); err != nil {
-			return fmt.Errorf("ошибка создания схемы БД: %v", err)
+	if isNew {
+		if _, err := conn.Exec(schema); err != nil {
+			conn.Close()
+			return nil, fmt.Errorf("failed to create schema: %v", err)
 		}
 	}
-	return nil
+	return &DB{conn: conn}, nil
+}
+
+func (db *DB) Conn() *sql.DB {
+	return db.conn
+}
+
+func (db *DB) Close() error {
+	return db.conn.Close()
 }
