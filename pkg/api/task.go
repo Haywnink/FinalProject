@@ -10,6 +10,8 @@ import (
 	"github.com/Haywnink/FinalProject/pkg/db"
 )
 
+const dateFormat = "20060102"
+
 func taskHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
@@ -41,9 +43,9 @@ func addTaskHandler(w http.ResponseWriter, r *http.Request) {
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 
 	if t.Date == "" {
-		t.Date = today.Format("20060102")
+		t.Date = today.Format(dateFormat)
 	} else {
-		d, err := time.ParseInLocation("20060102", t.Date, loc)
+		d, err := time.ParseInLocation(dateFormat, t.Date, loc)
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid date"})
 			return
@@ -57,7 +59,7 @@ func addTaskHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				t.Date = next
 			} else {
-				t.Date = today.Format("20060102")
+				t.Date = today.Format(dateFormat)
 			}
 		}
 	}
@@ -109,9 +111,9 @@ func updateTaskHandler(w http.ResponseWriter, r *http.Request) {
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 
 	if t.Date == "" {
-		t.Date = today.Format("20060102")
+		t.Date = today.Format(dateFormat)
 	} else {
-		d, err := time.ParseInLocation("20060102", t.Date, loc)
+		d, err := time.ParseInLocation(dateFormat, t.Date, loc)
 		if err != nil {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid date"})
 			return
@@ -125,7 +127,7 @@ func updateTaskHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				t.Date = next
 			} else {
-				t.Date = today.Format("20060102")
+				t.Date = today.Format(dateFormat)
 			}
 		}
 	}

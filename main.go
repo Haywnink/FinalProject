@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/Haywnink/FinalProject/pkg/server"
 	"log"
+
+	"github.com/Haywnink/FinalProject/pkg/server"
 )
 
 func main() {
